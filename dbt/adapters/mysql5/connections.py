@@ -86,6 +86,7 @@ class MySQLConnectionManager(SQLConnectionManager):
         kwargs["host"] = credentials.server
         kwargs["user"] = credentials.username
         kwargs["passwd"] = credentials.password
+        kwargs["database"] = credentials.schema
 
         if credentials.ssl_disabled:
             kwargs["ssl_disabled"] = credentials.ssl_disabled
@@ -96,27 +97,27 @@ class MySQLConnectionManager(SQLConnectionManager):
         try:
             connection.handle = mysql.connector.connect(**kwargs)
             connection.state = 'open'
-        except mysql.connector.Error:
+        # except mysql.connector.Error:
+        #
+        #     try:
+        #         logger.debug("Failed connection without supplying the `database`. "
+        #                      "Trying again with `database` included.")
+        #
+        #         # Try again with the database included
+        #         kwargs["database"] = credentials.schema
+        #
+        #         connection.handle = mysql.connector.connect(**kwargs)
+        #         connection.state = 'open'
+        except mysql.connector.Error as e:
 
-            try:
-                logger.debug("Failed connection without supplying the `database`. "
-                             "Trying again with `database` included.")
+            logger.debug("Got an error when attempting to open a mysql "
+                         "connection: '{}'"
+                         .format(e))
 
-                # Try again with the database included
-                kwargs["database"] = credentials.schema
+            connection.handle = None
+            connection.state = 'fail'
 
-                connection.handle = mysql.connector.connect(**kwargs)
-                connection.state = 'open'
-            except mysql.connector.Error as e:
-
-                logger.debug("Got an error when attempting to open a mysql "
-                             "connection: '{}'"
-                             .format(e))
-
-                connection.handle = None
-                connection.state = 'fail'
-
-                raise dbt.exceptions.FailedToConnectException(str(e))
+            raise dbt.exceptions.FailedToConnectException(str(e))
 
         return connection
 
